@@ -189,13 +189,15 @@ func (is *InfoStructure) updateMetricMap(allMetricNames []string,
 			newMetricMap[metric] = ""
 		}
 	}
-	fmt.Printf("%d", len(newMetricNames))
+	log.Printf("Found %d new metrics to process for synonyms", len(newMetricNames))
 	// Get metric synonyms (only for new metrics)
 	if len(newMetricNames) > 0 {
+		log.Printf("Processing metric synonyms in parallel batches...")
 		newMetricSynonyms, err := is.llmClient.GetMetricSynonyms(newMetricMap)
 		if err != nil {
 			return fmt.Errorf("error getting metric synonyms: %w", err)
 		}
+		log.Printf("Successfully processed %d metric synonyms", len(newMetricSynonyms))
 		if is.MetricMap.Map == nil {
 			is.MetricMap.Map = make(map[string]map[string]struct{})
 		}
@@ -232,12 +234,15 @@ func (is *InfoStructure) updateLabelMap(allLabelNames []string) error {
 		}
 	}
 
+	log.Printf("Found %d new labels to process for synonyms", len(newLabelNames))
 	// Get label synonyms (only for new labels)
 	if len(newLabelNames) > 0 {
+		log.Printf("Processing label synonyms in parallel batches...")
 		newLabelSynonyms, err := is.llmClient.GetLabelSynonyms(newLabelNames)
 		if err != nil {
 			return fmt.Errorf("error getting label synonyms: %w", err)
 		}
+		log.Printf("Successfully processed %d label synonyms", len(newLabelSynonyms))
 		if is.LabelMap.Map == nil {
 			is.LabelMap.Map = make(map[string]map[string]struct{})
 		}

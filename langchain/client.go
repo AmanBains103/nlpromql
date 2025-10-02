@@ -14,14 +14,24 @@ import (
 
 // LangChainClient implements the llm.LLMClient interface using LangChainGo.
 type LangChainClient struct {
-	llmModel llms.Model // Generic LangChainGo LLM model
+	llmModel       llms.Model      // Generic LangChainGo LLM model
+	batchProcessor *BatchProcessor // Batch processor for parallel processing
 }
 
 // NewLangChainClient creates a new LangChainClient.
 // The specific model (e.g., OpenAI, Anthropic) should be initialized and passed here.
 func NewLangChainClient(model llms.Model) *LangChainClient {
 	return &LangChainClient{
-		llmModel: model,
+		llmModel:       model,
+		batchProcessor: NewBatchProcessor(10, 5), // Default batch size of 10, max 5 workers
+	}
+}
+
+// NewLangChainClientWithBatchConfig creates a new LangChainClient with custom batch configuration.
+func NewLangChainClientWithBatchConfig(model llms.Model, batchSize, maxWorkers int) *LangChainClient {
+	return &LangChainClient{
+		llmModel:       model,
+		batchProcessor: NewBatchProcessor(batchSize, maxWorkers),
 	}
 }
 
@@ -31,7 +41,19 @@ func (c *LangChainClient) GetMetricSynonyms(metricMap map[string]string) (map[st
 		return nil, errors.New("LangChain LLM model is not initialized")
 	}
 
-	metricMapJSON, err := json.MarshalIndent(metricMap, "", "  ")
+	// If the metric map is small, process it directly without batching
+	if len(metricMap) <= c.batchProcessor.batchSize {
+		return c.getMetricSynonymsBatch(metricMap)
+	}
+
+	// Process in parallel batches
+	ctx := context.Background()
+	return c.batchProcessor.ProcessMetricBatches(ctx, metricMap, c.getMetricSynonymsBatch)
+}
+
+// getMetricSynonymsBatch processes a single batch of metrics
+func (c *LangChainClient) getMetricSynonymsBatch(metricBatch map[string]string) (map[string][]string, error) {
+	metricMapJSON, err := json.MarshalIndent(metricBatch, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("error marshalling metricMap: %w", err)
 	}
@@ -71,7 +93,19 @@ func (c *LangChainClient) GetLabelSynonyms(labelNames []string) (map[string][]st
 		return nil, errors.New("LangChain LLM model is not initialized")
 	}
 
-	labelNamesJSON, err := json.MarshalIndent(labelNames, "", "  ")
+	// If the label list is small, process it directly without batching
+	if len(labelNames) <= c.batchProcessor.batchSize {
+		return c.getLabelSynonymsBatch(labelNames)
+	}
+
+	// Process in parallel batches
+	ctx := context.Background()
+	return c.batchProcessor.ProcessLabelBatches(ctx, labelNames, c.getLabelSynonymsBatch)
+}
+
+// getLabelSynonymsBatch processes a single batch of labels
+func (c *LangChainClient) getLabelSynonymsBatch(labelBatch []string) (map[string][]string, error) {
+	labelNamesJSON, err := json.MarshalIndent(labelBatch, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("error marshalling labelNames: %w", err)
 	}

@@ -64,6 +64,25 @@ API keys are required to authenticate with the LLM providers. They can be provid
 
 If the required API key for the selected `llm_model_name` is not found either via its flag or environment variable, the application will print an error and exit.
 
+#### Parallel Processing Configuration
+
+The application supports parallel batch processing of LLM requests to improve performance when building the information structure from Prometheus. This is especially useful when dealing with large numbers of metrics and labels.
+
+*   **`-batch_size`** (Command-line flag)
+    *   Specifies the number of items (metrics or labels) to process in a single LLM request.
+    *   Default: `10`
+    *   Example: `-batch_size=20` will process 20 items per LLM request.
+
+*   **`-max_workers`** (Command-line flag)
+    *   Specifies the maximum number of parallel workers making concurrent LLM requests.
+    *   Default: `5`
+    *   Example: `-max_workers=10` will allow up to 10 concurrent LLM requests.
+
+**Note:** Increasing these values can significantly speed up the initial information structure building phase, but be mindful of:
+- Your LLM provider's rate limits
+- API costs (more parallel requests may consume your quota faster)
+- Memory usage on your system
+
 ## 4. Running the Application
 
 ### 4.1. Build
@@ -90,6 +109,14 @@ export OPENAI_API_KEY="your_openai_api_key_here"
 export PROMETHEUS_URL="http://localhost:9090"
 ./nlpromql -mode="chat" -llm_model_name="openai/gpt-3.5-turbo" -openai_api_key="your_openai_api_key_here"
 ```
+
+**Example with custom batch processing configuration:**
+```bash
+export PROMETHEUS_URL="http://localhost:9090"
+export OPENAI_API_KEY="your_openai_api_key_here"
+./nlpromql -mode="chat" -llm_model_name="openai/gpt-3.5-turbo" -batch_size=20 -max_workers=10
+```
+This configuration will process 20 metrics/labels per LLM request with up to 10 concurrent workers, significantly speeding up the initial information structure build.
 
 **Example with Anthropic (using environment variable for API key):**
 ```bash

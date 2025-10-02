@@ -26,6 +26,8 @@ func main() {
 	openaiAPIKeyFlag := flag.String("openai_api_key", "", "OpenAI API key. Overrides OPENAI_API_KEY environment variable.")
 	anthropicAPIKeyFlag := flag.String("anthropic_api_key", "", "Anthropic API key. Overrides ANTHROPIC_API_KEY environment variable.")
 	_ = flag.String("cohere_api_key", "", "Cohere API key. Overrides COHERE_API_KEY environment variable.") // Defined, not used yet - assigned to blank identifier
+	batchSize := flag.Int("batch_size", 10, "Batch size for parallel LLM requests when building information structure")
+	maxWorkers := flag.Int("max_workers", 5, "Maximum number of parallel workers for LLM requests")
 
 	flag.Parse()
 
@@ -84,12 +86,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	chosenLLMClient := langchain.NewLangChainClient(lcModel)
+	chosenLLMClient := langchain.NewLangChainClientWithBatchConfig(lcModel, *batchSize, *maxWorkers)
 	// NewLangChainClient currently doesn't return an error. If it could, error should be handled:
 	// if err != nil {
 	// fmt.Fprintf(os.Stderr, "Error creating LangChainClient: %v\n", err)
 	// os.Exit(1)
 	// }
+	
+	fmt.Printf("LLM client configured with batch size: %d, max workers: %d\n", *batchSize, *maxWorkers)
 
 	// 3. Get Prometheus Credentials from Environment Variables
 	promURL, promUser, promPassword, err := getPrometheusCredentials()
