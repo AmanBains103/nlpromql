@@ -31,6 +31,71 @@ func (c *LangChainClient) GetMetricSynonyms(metricMap map[string]string) (map[st
 		return nil, errors.New("LangChain LLM model is not initialized")
 	}
 
+	// Define batch size for parallel processing
+	batchSize := 10
+	totalMetrics := len(metricMap)
+	
+	// If the map is small enough, process in a single call
+	if totalMetrics <= batchSize {
+		return c.processMetricBatch(metricMap)
+	}
+
+	// Split metrics into batches
+	batches := make([]map[string]string, 0)
+	currentBatch := make(map[string]string)
+	count := 0
+	
+	for metric, description := range metricMap {
+		currentBatch[metric] = description
+		count++
+		
+		if count >= batchSize {
+			batches = append(batches, currentBatch)
+			currentBatch = make(map[string]string)
+			count = 0
+		}
+	}
+	
+	// Add remaining metrics to the last batch
+	if len(currentBatch) > 0 {
+		batches = append(batches, currentBatch)
+	}
+
+	// Process batches in parallel
+	type result struct {
+		synonyms map[string][]string
+		err      error
+	}
+	
+	resultChan := make(chan result, len(batches))
+	
+	// Launch goroutines for parallel processing
+	for _, batch := range batches {
+		go func(b map[string]string) {
+			synonyms, err := c.processMetricBatch(b)
+			resultChan <- result{synonyms: synonyms, err: err}
+		}(batch)
+	}
+	
+	// Collect results
+	allSynonyms := make(map[string][]string)
+	for i := 0; i < len(batches); i++ {
+		res := <-resultChan
+		if res.err != nil {
+			return nil, fmt.Errorf("error processing batch: %w", res.err)
+		}
+		
+		// Merge results
+		for metric, synonyms := range res.synonyms {
+			allSynonyms[metric] = synonyms
+		}
+	}
+	
+	return allSynonyms, nil
+}
+
+// processMetricBatch processes a single batch of metrics
+func (c *LangChainClient) processMetricBatch(metricMap map[string]string) (map[string][]string, error) {
 	metricMapJSON, err := json.MarshalIndent(metricMap, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("error marshalling metricMap: %w", err)
@@ -71,6 +136,60 @@ func (c *LangChainClient) GetLabelSynonyms(labelNames []string) (map[string][]st
 		return nil, errors.New("LangChain LLM model is not initialized")
 	}
 
+	// Define batch size for parallel processing
+	batchSize := 20
+	totalLabels := len(labelNames)
+	
+	// If the list is small enough, process in a single call
+	if totalLabels <= batchSize {
+		return c.processLabelBatch(labelNames)
+	}
+
+	// Split labels into batches
+	batches := make([][]string, 0)
+	for i := 0; i < totalLabels; i += batchSize {
+		end := i + batchSize
+		if end > totalLabels {
+			end = totalLabels
+		}
+		batches = append(batches, labelNames[i:end])
+	}
+
+	// Process batches in parallel
+	type result struct {
+		synonyms map[string][]string
+		err      error
+	}
+	
+	resultChan := make(chan result, len(batches))
+	
+	// Launch goroutines for parallel processing
+	for _, batch := range batches {
+		go func(b []string) {
+			synonyms, err := c.processLabelBatch(b)
+			resultChan <- result{synonyms: synonyms, err: err}
+		}(batch)
+	}
+	
+	// Collect results
+	allSynonyms := make(map[string][]string)
+	for i := 0; i < len(batches); i++ {
+		res := <-resultChan
+		if res.err != nil {
+			return nil, fmt.Errorf("error processing batch: %w", res.err)
+		}
+		
+		// Merge results
+		for label, synonyms := range res.synonyms {
+			allSynonyms[label] = synonyms
+		}
+	}
+	
+	return allSynonyms, nil
+}
+
+// processLabelBatch processes a single batch of labels
+func (c *LangChainClient) processLabelBatch(labelNames []string) (map[string][]string, error) {
 	labelNamesJSON, err := json.MarshalIndent(labelNames, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("error marshalling labelNames: %w", err)
