@@ -189,9 +189,10 @@ func (is *InfoStructure) updateMetricMap(allMetricNames []string,
 			newMetricMap[metric] = ""
 		}
 	}
-	fmt.Printf("%d", len(newMetricNames))
+	fmt.Printf("Found %d new metrics to process\n", len(newMetricNames))
 	// Get metric synonyms (only for new metrics)
 	if len(newMetricNames) > 0 {
+		is.updateProgressStage(fmt.Sprintf("Getting synonyms for %d new metrics (batch processing)", len(newMetricNames)))
 		newMetricSynonyms, err := is.llmClient.GetMetricSynonyms(newMetricMap)
 		if err != nil {
 			return fmt.Errorf("error getting metric synonyms: %w", err)
@@ -231,9 +232,11 @@ func (is *InfoStructure) updateLabelMap(allLabelNames []string) error {
 			newLabelNames = append(newLabelNames, label)
 		}
 	}
-
+	
+	fmt.Printf("Found %d new labels to process\n", len(newLabelNames))
 	// Get label synonyms (only for new labels)
 	if len(newLabelNames) > 0 {
+		is.updateProgressStage(fmt.Sprintf("Getting synonyms for %d new labels (batch processing)", len(newLabelNames)))
 		newLabelSynonyms, err := is.llmClient.GetLabelSynonyms(newLabelNames)
 		if err != nil {
 			return fmt.Errorf("error getting label synonyms: %w", err)
